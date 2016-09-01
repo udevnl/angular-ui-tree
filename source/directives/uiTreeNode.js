@@ -356,132 +356,132 @@
                   }
                 }
 
-                // move horizontal
-                if (pos.dirAx && pos.distAxX >= config.levelThreshold) {
-                  pos.distAxX = 0;
-
-                  // increase horizontal level if previous sibling exists and is not collapsed
-                  if (pos.distX > 0) {
-                    prev = dragInfo.prev();
-                    if (prev && !prev.collapsed
-                      && prev.accept(scope, prev.childNodesCount())) {
-                      prev.$childNodesScope.$element.append(placeElm);
-                      dragInfo.moveTo(prev.$childNodesScope, prev.childNodes(), prev.childNodesCount());
-                    }
-                  }
-
-                  // decrease horizontal level
-                  if (pos.distX < 0) {
-                    // we can't decrease a level if an item preceeds the current one
-                    next = dragInfo.next();
-                    if (!next) {
-                      target = dragInfo.parentNode(); // As a sibling of it's parent node
-                      if (target
-                        && target.$parentNodesScope.accept(scope, target.index() + 1)) {
-                        target.$element.after(placeElm);
-                        dragInfo.moveTo(target.$parentNodesScope, target.siblings(), target.index() + 1);
-                      }
-                    }
-                  }
+                // movement
+                if (UiTreeHelper.elementIsTree(targetElm)) {
+                  targetNode = targetElm.controller('uiTree').scope;
+                } else if (UiTreeHelper.elementIsTreeNodeHandle(targetElm)) {
+                  targetNode = targetElm.controller('uiTreeHandle').scope;
+                } else if (UiTreeHelper.elementIsTreeNode(targetElm)) {
+                  targetNode = targetElm.controller('uiTreeNode').scope;
+                } else if (UiTreeHelper.elementIsTreeNodes(targetElm)) {
+                  targetNode = targetElm.controller('uiTreeNodes').scope;
+                } else if (UiTreeHelper.elementIsPlaceholder(targetElm)) {
+                  targetNode = targetElm.controller('uiTreeNodes').scope;
+                } else if (targetElm.controller('uiTreeNode')) {
+                  // is a child element of a node
+                  targetNode = targetElm.controller('uiTreeNode').scope;
                 }
 
-                // move vertical
-                if (!pos.dirAx) {
-                  if (UiTreeHelper.elementIsTree(targetElm)) {
-                    targetNode = targetElm.controller('uiTree').scope;
-                  } else if (UiTreeHelper.elementIsTreeNodeHandle(targetElm)) {
-                    targetNode = targetElm.controller('uiTreeHandle').scope;
-                  } else if (UiTreeHelper.elementIsTreeNode(targetElm)) {
-                    targetNode = targetElm.controller('uiTreeNode').scope;
-                  } else if (UiTreeHelper.elementIsTreeNodes(targetElm)) {
-                    targetNode = targetElm.controller('uiTreeNodes').scope;
-                  } else if (UiTreeHelper.elementIsPlaceholder(targetElm)) {
-                    targetNode = targetElm.controller('uiTreeNodes').scope;
-                  } else if (targetElm.controller('uiTreeNode')) {
-                    // is a child element of a node
-                    targetNode = targetElm.controller('uiTreeNode').scope;
+                // check it's new position
+                isEmpty = false;
+                if (!targetNode) {
+                  return;
+                }
+
+                // Show the placeholder if it was hidden for nodrop-enabled and this is a new tree
+                if (targetNode.$treeScope && !targetNode.$parent.nodropEnabled && !targetNode.$treeScope.nodropEnabled) {
+                  placeElm.css('display', '');
+                }
+
+                if (targetNode.$type == 'uiTree' && targetNode.dragEnabled) {
+                  isEmpty = targetNode.isEmpty(); // Check if it's empty tree
+                }
+
+                if (targetNode.$type == 'uiTreeHandle') {
+                  targetNode = targetNode.$nodeScope;
+                }
+
+                if (targetNode.$type != 'uiTreeNode'
+                  && !isEmpty) { // Check if it is a uiTreeNode or it's an empty tree
+                  // console.log("empty tree type = " + targetNode.$type);
+                  // console.log(targetNode);
+                  return;
+                }
+
+                // if placeholder move from empty tree, reset it.
+                if (treeScope && placeElm.parent()[0] != treeScope.$element[0]) {
+                  treeScope.resetEmptyElement();
+                  treeScope = null;
+                }
+
+                if (isEmpty) { // it's an empty tree
+                  treeScope = targetNode;
+                  if (targetNode.$nodesScope.accept(scope, 0)) {
+                    targetNode.place(placeElm);
+                    dragInfo.moveTo(targetNode.$nodesScope, targetNode.$nodesScope.childNodes(), 0);
+                  }
+                } else if (targetNode.dragEnabled()) { // drag enabled
+                  if (angular.isDefined(scope.expandTimeoutOn) && scope.expandTimeoutOn !== targetNode.id) {
+                    $timeout.cancel(scope.expandTimeout);
+                    delete scope.expandTimeout;
+                    delete scope.expandTimeoutOn;
+
+                    scope.$callbacks.expandTimeoutCancel();
                   }
 
-                  // check it's new position
-                  isEmpty = false;
-                  if (!targetNode) {
-                    return;
-                  }
+                  if (targetNode.collapsed) {
+                    if (scope.expandOnHover === true || (angular.isNumber(scope.expandOnHover) && scope.expandOnHover === 0)) {
+                      targetNode.collapsed = false;
+                    } else if (scope.expandOnHover !== false && angular.isNumber(scope.expandOnHover) && scope.expandOnHover > 0) {
+                      if (angular.isUndefined(scope.expandTimeoutOn)) {
+                        scope.expandTimeoutOn = targetNode.$id;
 
-                  // Show the placeholder if it was hidden for nodrop-enabled and this is a new tree
-                  if (targetNode.$treeScope && !targetNode.$parent.nodropEnabled && !targetNode.$treeScope.nodropEnabled) {
-                    placeElm.css('display', '');
-                  }
-
-                  if (targetNode.$type == 'uiTree' && targetNode.dragEnabled) {
-                    isEmpty = targetNode.isEmpty(); // Check if it's empty tree
-                  }
-
-                  if (targetNode.$type == 'uiTreeHandle') {
-                    targetNode = targetNode.$nodeScope;
-                  }
-
-                  if (targetNode.$type != 'uiTreeNode'
-                    && !isEmpty) { // Check if it is a uiTreeNode or it's an empty tree
-                    return;
-                  }
-
-                  // if placeholder move from empty tree, reset it.
-                  if (treeScope && placeElm.parent()[0] != treeScope.$element[0]) {
-                    treeScope.resetEmptyElement();
-                    treeScope = null;
-                  }
-
-                  if (isEmpty) { // it's an empty tree
-                    treeScope = targetNode;
-                    if (targetNode.$nodesScope.accept(scope, 0)) {
-                      targetNode.place(placeElm);
-                      dragInfo.moveTo(targetNode.$nodesScope, targetNode.$nodesScope.childNodes(), 0);
-                    }
-                  } else if (targetNode.dragEnabled()) { // drag enabled
-                      if (angular.isDefined(scope.expandTimeoutOn) && scope.expandTimeoutOn !== targetNode.id) {
-                        $timeout.cancel(scope.expandTimeout);
-                        delete scope.expandTimeout;
-                        delete scope.expandTimeoutOn;
-
-                        scope.$callbacks.expandTimeoutCancel();
-                      }
-
-                      if (targetNode.collapsed) {
-                        if (scope.expandOnHover === true || (angular.isNumber(scope.expandOnHover) && scope.expandOnHover === 0)) {
+                        scope.$callbacks.expandTimeoutStart();
+                        scope.expandTimeout = $timeout(function()
+                        {
+                          scope.$callbacks.expandTimeoutEnd();
                           targetNode.collapsed = false;
-                        } else if (scope.expandOnHover !== false && angular.isNumber(scope.expandOnHover) && scope.expandOnHover > 0) {
-                          if (angular.isUndefined(scope.expandTimeoutOn)) {
-                            scope.expandTimeoutOn = targetNode.$id;
-
-                            scope.$callbacks.expandTimeoutStart();
-                            scope.expandTimeout = $timeout(function()
-                            {
-                              scope.$callbacks.expandTimeoutEnd();
-                              targetNode.collapsed = false;
-                            }, scope.expandOnHover);
-                          }
-                        }
+                        }, scope.expandOnHover);
                       }
+                    }
+                  }
 
-                    targetElm = targetNode.$element; // Get the element of ui-tree-node
-                    targetOffset = UiTreeHelper.offset(targetElm);
-                    targetBefore = targetNode.horizontal ? eventObj.pageX < (targetOffset.left + UiTreeHelper.width(targetElm) / 2)
-                      : eventObj.pageY < (targetOffset.top + UiTreeHelper.height(targetElm) / 2);
+                  targetElm = targetNode.$element; // Get the element of ui-tree-node
+                  targetOffset = UiTreeHelper.offset(targetElm);
 
-                    if (targetNode.$parentNodesScope.accept(scope, targetNode.index())) {
-                      if (targetBefore) {
-                        targetElm[0].parentNode.insertBefore(placeElm[0], targetElm[0]);
-                        dragInfo.moveTo(targetNode.$parentNodesScope, targetNode.siblings(), targetNode.index());
-                      } else {
-                        targetElm.after(placeElm);
-                        dragInfo.moveTo(targetNode.$parentNodesScope, targetNode.siblings(), targetNode.index() + 1);
-                      }
-                    } else if (!targetBefore && targetNode.accept(scope, targetNode.childNodesCount())) { // we have to check if it can add the dragging node as a child
+                  // Determine the scenario depening on the hot-spot.
+                  // - Put before?
+                  // - Put after?
+                  // - Put as child?
+                  
+                  var dragAsChild, dragBefore;
+
+                  if(targetNode.horizontal) {
+                    // Vertical tree layout - Hotspots:
+                    //    +-----------------------------------+
+                    //    |  Put before     |     Put after   |
+                    //    | --------------------------------- | /\
+                    //    |            put as child           | ||  config.levelThreshold
+                    //    +-----------------------------------+ \/
+                    dragBefore = eventObj.pageX < (targetOffset.left + UiTreeHelper.width(targetElm) / 2);
+                    dragAsChild = eventObj.pageY > (targetOffset.top + (UiTreeHelper.height(targetElm) * (100 - config.levelThreshold) / 100));
+
+                  } else {
+                    // Vertical tree layout - Hotspots:
+                    //    +-----------------------------------+
+                    //    |  Put before              |  Put   |
+                    //    | ------------------------ |   as   |
+                    //    |  Put after               | Child  |
+                    //    +-----------------------------------+
+                    //                                <------> 
+                    //                         config.levelThreshold
+                    dragBefore = eventObj.pageY < (targetOffset.top + UiTreeHelper.height(targetElm) / 2);
+                    dragAsChild = eventObj.pageX > (targetOffset.left + (UiTreeHelper.width(targetElm) * (100 - config.levelThreshold) / 100));
+                  }
+
+                  if(dragAsChild) {
+                    if(!targetNode.collapsed && targetNode.accept(scope, targetNode.childNodesCount())) {
                       targetNode.$childNodesScope.$element.append(placeElm);
                       dragInfo.moveTo(targetNode.$childNodesScope, targetNode.childNodes(), targetNode.childNodesCount());
+                    }
+
+                  } else {
+                    if(dragBefore) {
+                      targetElm[0].parentNode.insertBefore(placeElm[0], targetElm[0]);
+                      dragInfo.moveTo(targetNode.$parentNodesScope, targetNode.siblings(), targetNode.index());
                     } else {
-                      outOfBounds = true;
+                      targetElm.after(placeElm);
+                      dragInfo.moveTo(targetNode.$parentNodesScope, targetNode.siblings(), targetNode.index() + 1);
                     }
                   }
                 }
